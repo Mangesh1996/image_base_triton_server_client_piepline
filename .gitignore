@@ -6,3 +6,8 @@ test/
 test.py
 __pycache__/
 tao_triton/python/utils/__pycache__/
+tao_triton/python/types/__pycache__/
+tao_triton/python/proto/__pycache__/
+tao_triton/python/postprocessing/__pycache__/
+tao_triton/python/model/__pycache__/
+tao_triton/python/__pycache__/
