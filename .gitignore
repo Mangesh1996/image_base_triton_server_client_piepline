@@ -1,0 +1,6 @@
+input_image/
+model_respository/
+models/
+out/
+test/
+test.py
