@@ -4,4 +4,5 @@ models/
 out/
 test/
 test.py
-__pycache__
+__pycache__/
+tao_triton/python/utils/__pycache__/
