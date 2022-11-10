@@ -57,13 +57,13 @@ class Tao_Model_Tao_plan:
     def check_config_files(self):
         file_name=["/labels.txt","/resnet18_detector.etlt","/config.pbtxt","/clustering_config.prototxt","/pgie_config.txt"]
         mode_path=os.path.join(os.getcwd(),"models",self.model_name)
-
         for file in file_name:
             if os.path.isfile(mode_path+file):
-                console_logger.debug((file,"are present"))
+                pass
             else:
                 console_logger.debug(f"Missing {file} file Kindly check config directory")
                 return False
+        console_logger.debug((file_name,"are present"))
         return True
 
 
@@ -77,7 +77,8 @@ class Tao_Model_Tao_plan:
                 out_config=conf_read[re.search("output-blob-names",conf_read).end()+1:].split("\n")[0].replace(";",",")
                 key_name=conf_read[re.search("tlt-model-key",conf_read).end()+1:].split("\n")[0]
                 if os.path.isfile(os.path.join(os.getcwd(),"model_respository",self.model_name,"1","model.plan")):
-                    console_logger.debug("Already Plan file present we are create again")
+                    console_logger.debug("Already Plan file present ....")
+                    return True
                 else:
                     p_tao = subprocess.Popen(["tao","converter", "/opt/tao_models/model/resnet18_detector.etlt", "-k",key_name, "-d",dim, "-o",out_config, "-m", "16", "-e", "/opt/tritonserver/model_plane/model.plan"], stdout=subprocess.PIPE)
                     p_tao.wait()
@@ -143,14 +144,17 @@ class Tao_Model_Tao_plan:
             gpu=docker.types.DeviceRequest(device_ids=["0"], capabilities=[['gpu']])
             self.container_name="tao_triton_server"
             if bool(client.containers.list(filters={"name":"tao_triton_server","status":"running"})):
-                client.containers.list(filters={"name":"tao_triton_server","status":"running"})[0].stop()
-                console_logger.debug("tao_triton_server alreay stop wait  to close")               
-                client.containers.run("nvcr.io/nvidia/tritonserver:22.05-py3",command="tritonserver --model-repository=/opt/tritonserver/models --strict-model-config=false --grpc-infer-allocation-pool-size=16",auto_remove=True,device_requests=[gpu],ipc_mode="host",ports={"8000":8000,"8001":8001,"8002":8002},volumes=[f"{os.getcwd()}/model_respository:/opt/tritonserver/models"],detach=True,name=self.container_name)
+                # client.containers.list(filters={"name":"tao_triton_server","status":"running"})[0].stop()
+                # console_logger.debug("tao_triton_server alreay stop wait  to close")               
+                # client.containers.run("nvcr.io/nvidia/tritonserver:22.05-py3",command="tritonserver --model-repository=/opt/tritonserver/models --strict-model-config=false --grpc-infer-allocation-pool-size=16",auto_remove=True,device_requests=[gpu],ipc_mode="host",ports={"8000":8000,"8001":8001,"8002":8002},volumes=[f"{os.getcwd()}/model_respository:/opt/tritonserver/models"],detach=True,name=self.container_name)
+                console_logger.debug("Trion Server Already Start")
             else:
-                 client.containers.run("nvcr.io/nvidia/tritonserver:22.05-py3",command="tritonserver --model-repository=/opt/tritonserver/models --strict-model-config=false --grpc-infer-allocation-pool-size=16",auto_remove=True,device_requests=[gpu],ipc_mode="host",ports={"8000":8000,"8001":8001,"8002":8002},volumes=[f"{os.getcwd()}/model_respository:/opt/tritonserver/models"],detach=True,name=self.container_name)        
+                 client.containers.run("nvcr.io/nvidia/tritonserver:22.05-py3",command="tritonserver --model-repository=/opt/tritonserver/models --strict-model-config=false --grpc-infer-allocation-pool-size=16",auto_remove=True,device_requests=[gpu],ipc_mode="host",ports={"8000":8000,"8001":8001,"8002":8002},volumes=[f"{os.getcwd()}/model_respository:/opt/tritonserver/models"],detach=True,name=self.container_name)
+                 console_logger.debug("Triton Server Started .... ") 
+                 time.sleep(5)    
         else:
             console_logger.debug("Something wrong in config files or model plan file")
-        time.sleep(5)
+        
 
     def triton_server_stop(self):
         client=docker.from_env()
@@ -181,7 +185,7 @@ class Triton_Inference_Client():
     def deploy_healthcheck(self):
         try:
             r = requests.get("http://localhost:8000/v2/health/ready",timeout=(60))
-            print(r.status_code)
+            console_logger.debug({r.status_code:"Trion Server Succefully Running ..."})
             if r.status_code == 200 or r.status_code == 400:
                     self.tao_client()
                     return True
