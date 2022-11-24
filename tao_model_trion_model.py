@@ -8,7 +8,7 @@ import docker
 import re
 import requests
 import time
-
+import numpy as np
 class Tao_Model_Tao_plan:
     def __init__(self,model_name):
         self.model_name=model_name
@@ -60,12 +60,42 @@ class Tao_Model_Tao_plan:
         for file in file_name:
             if os.path.isfile(mode_path+file):
                 pass
+            elif file =="/clustering_config.prototxt":
+                console_logger.debug(f"This file creating ")
+                self.clustering_config_creation(mode_path+file)
             else:
                 console_logger.debug(f"Missing {file} file Kindly check config directory")
                 return False
         console_logger.debug((file_name,"are present"))
         return True
 
+    def clustering_config_creation(self,path):
+        data='''linewidth: 4\nstride: 16\n'''
+        with open(os.path.join(os.getcwd(),"models",self.model_name,"labels.txt"),"r") as label_name:
+            label_names=[label.split("\n")[0] for label in label_name.readlines() ]
+        for label_name in label_names:
+            random_color=list(np.random.choice(range(255),size=3))
+            label_name='''classwise_clustering_config{
+            key: "'''+label_name+'''" 
+            value:{
+                coverage_threshold:0.005
+                minimum_bounding_box_height:4
+                dbscan_config{
+                    dbscan_eps:0.3
+                    dbscan_min_samples:0.05
+                    dbscan_confidence_threshold: 0.9
+                }
+                bbox_color{
+                    R:'''+str(random_color[0])+'''
+                    G:'''+str(random_color[1])+'''
+                    B:'''+str(random_color[2])+'''
+                }
+            }
+        }
+        '''
+            data=data+label_name
+        with open(path,"a")as writes_data:
+            writes_data.write(data)
 
     def create_triton_config_file(self):
         try:
@@ -80,7 +110,7 @@ class Tao_Model_Tao_plan:
                     console_logger.debug("Already Plan file present ....")
                     return True
                 else:
-                    p_tao = subprocess.Popen(["tao","converter", "/opt/tao_models/model/resnet18_detector.etlt", "-k",key_name, "-d",dim, "-o",out_config, "-m", "16", "-e", "/opt/tritonserver/model_plane/model.plan"], stdout=subprocess.PIPE)
+                    p_tao = subprocess.Popen(["tao","converter", "/opt/tao_models/model/resnet18_detector.etlt", "-k",key_name, "-d",dim, "-o",out_config, "-m", "32", "-e", "/opt/tritonserver/model_plane/model.plan"], stdout=subprocess.PIPE)
                     p_tao.wait()
                     out, err = p_tao.communicate()
                     out = out.decode('UTF-8')
@@ -99,11 +129,10 @@ class Tao_Model_Tao_plan:
         try:
             model_stride=16            
             with open(os.path.join(os.getcwd(),"models",self.model_name,"labels.txt")) as clss_name:
-                class_name=clss_name.readlines()
-            class_name=[cls.split("\n")[0] for cls in class_name ]
+                class_name=[cls.split("\n")[0] for cls in clss_name.readlines() ]
             config_format='''name: "'''+self.model_name+'''"
     platform: "tensorrt_plan"
-    max_batch_size: 16
+    max_batch_size: 32
     input [
     {
         name: "input_1"
@@ -129,17 +158,16 @@ class Tao_Model_Tao_plan:
             with open(os.path.join(os.getcwd(),"model_respository",self.model_name,"config.pbtxt"),"w")as config_write:
                 config_write.write(config_format)
             with open(os.path.join(os.getcwd(),"models",self.model_name,"labels.txt"),"r") as label_name:
-                label_name=label_name.readlines()
-            label_name=[label.split("\n")[0] for label in label_name ]
-            label_name=",".join(label_name)
+                label_name=",".join([label.split("\n")[0] for label in label_name.readlines()])
             with open(os.path.join(os.getcwd(),"model_respository",self.model_name,"labels.txt"),"w") as labels:
                 labels.write(label_name)
             return True
         except Exception as e:
             console_logger.debug(e)
             return False
+
     def triton_server_start(self):
-        if self.create_triton_config_file and self.trion_config_file:
+        if self.create_triton_config_file() and self.check_config_files:
             client=docker.from_env()
             gpu=docker.types.DeviceRequest(device_ids=["0"], capabilities=[['gpu']])
             self.container_name="tao_triton_server"
@@ -162,58 +190,11 @@ class Tao_Model_Tao_plan:
         print(self.container_name,"stop")
 
 
-class Triton_Inference_Client():
-    '''verbose(boolean) = get the logs,
-    asynce_set(boolean)= ,
-    streaming(boolean)= ,
-    MODEL_NAME(str)= Model name,
-    MODEL_VERSION(int)=version,
-    BATCH_SIZE(int)=batch size,
-    mode(str)= choice any one {Classification,DetectNet_v2,LPRNet,YOLOv3,Peoplesegnet,Retinanet,Multitask_classification,Pose_classification}
-    URL(str)= localhost:8000 depend on protocal(http or grpc)
-    PROTOCOL(str)=
-    class_list(str)=list of class eg cat,dog
-    output_path(str)=path of save output
-    postprocessing_config=path of clustering config.prototxt 
-    dataset_convert_config= ,
-    image_filename(str)=path of input images files    
-    '''
-    def __init__(self, dicst,model_name):
-        self.dicst=dicst
-        self.model_name=model_name
-
-    def deploy_healthcheck(self):
-        try:
-            r = requests.get("http://localhost:8000/v2/health/ready",timeout=(60))
-            console_logger.debug({r.status_code:"Trion Server Succefully Running ..."})
-            if r.status_code == 200 or r.status_code == 400:
-                    self.tao_client()
-                    return True
-        except requests.exceptions.ConnectionError as e:
-            console_logger.debug(e)
-            self.deploy_healthcheck()
-
-    def tao_client(self):
-        with open(os.path.join(os.getcwd(),"model_respository",self.model_name,"labels.txt"),"r") as labels_name:
-            label_name=labels_name.read().splitlines()
-        label_names=",".join(label_name)
-        self.dicst["postprocessing_config"]=f"{os.getcwd()}/models/{self.model_name}/clustering_config.prototxt"
-        self.dicst["class_list"]=label_names
-        self.dicst["model_name"]=self.model_name
-        # self.dicts={"verbose":False,"async_set":False,"streaming":False,"model_name":"hat","model_version":str(1),"batch_size":1,"mode":"DetectNet_v2","url":"localhost:8000","protocol":"HTTP","image_filename":f"{os.getcwd()}/input_image","class_list":"with_hat,without_hat","output_path":"out","postprocessing_config":f"{os.getcwd()}/models/hat/clustering_config.prototxt","dataset_convert_config":""}
-        tao_client_run.main(self.dicst)
-        
-    
-
 
 if __name__=="__main__":
     tao_server_pipeline=Tao_Model_Tao_plan(model_name="hat")
-    tao_server_pipeline.create_triton_config_file()
+    # tao_server_pipeline.create_triton_config_file()
     tao_server_pipeline.triton_server_start()
-    dicts={"verbose":False,"async_set":True,"streaming":True,"model_name":"","model_version":str(1),"batch_size":1,"mode":"DetectNet_v2","url":"localhost:8001","protocol":"grpc","image_filename":f"{os.getcwd()}/input_image","class_list":"","output_path":"out","postprocessing_config":"","dataset_convert_config":""}
-    tao_client=Triton_Inference_Client(dicts,model_name="hat")
-    tao_client.deploy_healthcheck()
-    # # tao_client.tao_client()
 
 
 
