@@ -27,7 +27,7 @@ class Triton_Inference_Client():
     @staticmethod
     def deploy_healthcheck(dicst):
         try:
-            r = requests.get("http://localhost:8000/v2/health/ready",timeout=(60))
+            r = requests.get("http://localhost:8000/v2/health/ready",timeout=(20))
             console_logger.debug({r.status_code:"Trion Server Succefully Running ..."})
             if r.status_code == 200 or r.status_code == 400:
                     Triton_Inference_Client.tao_client(dicst,model_name=dicst["model_name"])

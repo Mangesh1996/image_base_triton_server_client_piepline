@@ -24,7 +24,7 @@ from functools import partial
 import logging
 import os
 import sys
-
+from logger import console_logger
 import json
 from attrdict import AttrDict
 import numpy as np
@@ -384,6 +384,7 @@ def main(dicst):
                     print("inference failed: " + str(error))
                     sys.exit(1)
                 responses.append(results)
+                (responses)
     else:
         if dicst["async_set"]:
             # Collect results from the ongoing async requests
@@ -404,15 +405,18 @@ def main(dicst):
                 postprocessor.apply(
                     response, this_id, render=True, action_data=action_data
                 )
+               
             else:
                 postprocessor.apply(
                     response, this_id, render=True
                 )
+              
             processed_request += 1
             pbar.update(int(dicst["batch_size"]))
 
     if os.path.splitext(dicst["image_filename"])[-1] == ".json":
         output_file = os.path.join(dicst["output_path"], "results.json")
+        console_logger.debug(output_file)
         for b in range(len(action_data)):
             for f in range(len(action_data[b]["batches"])):
                 for p in range(len(action_data[b]["batches"][f]["objects"])):

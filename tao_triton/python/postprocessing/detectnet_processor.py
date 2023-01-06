@@ -213,9 +213,11 @@ class DetectNetPostprocessor(Postprocessor):
                         os.makedirs(os.path.dirname(output_image_file))
                     processes.append(
                         pool.apply_async(
-                            write_kitti_annotation, (output_label_file, batchwise_boxes[image_idx])
+                            write_kitti_annotation, (filename, batchwise_boxes[image_idx])
                         )
+                        
                     )
+                    
                     processes.append(
                         pool.apply_async(
                             render_image,

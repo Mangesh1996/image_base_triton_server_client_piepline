@@ -24,10 +24,10 @@ from copy import deepcopy
 import logging
 from multiprocessing import Pool
 import os
-
+import cv2
 import numpy as np
 from sklearn.cluster import DBSCAN as dbscan
-from PIL import ImageDraw
+from PIL import ImageDraw,ImageFont
 
 from tao_triton.python.types import KittiBbox
 from tao_triton.python.utils.kitti import write_kitti_annotation
@@ -136,6 +136,8 @@ def render_image(frame, image_wise_bboxes, output_image_file, box_color, linewid
                 x2 = min(frame.width, box[2] + i)
                 y2 = min(frame.height, box[3] + i)
                 draw.rectangle(box, outline=outline_color)
+                draw.text((box[0],box[1]-10),class_name,fill="red")
+                # cv2.putText(draw, class_name, (box[0],box[1] - 5),cv2.FONT_HERSHEY_SIMPLEX, (255,255,255),0.6)
     image.save(output_image_file)
 
 
