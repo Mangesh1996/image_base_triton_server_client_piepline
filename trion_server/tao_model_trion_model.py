@@ -3,7 +3,7 @@ from logger import  console_logger
 import os
 import json
 from math import ceil
-import tao_client_run
+
 import docker
 import re
 import requests
@@ -55,7 +55,7 @@ class Tao_Model_Tao_plan:
             return False
 
     def check_config_files(self):
-        file_name=["/labels.txt","/resnet18_detector.etlt","/config.pbtxt","/clustering_config.prototxt","/pgie_config.txt"]
+        file_name=["/labels.txt","/resnet18_detector.etlt","/clustering_config.prototxt","/pgie_config.txt"]
         mode_path=os.path.join(os.getcwd(),"models",self.model_name)
         for file in file_name:
             if os.path.isfile(mode_path+file):
@@ -101,16 +101,17 @@ class Tao_Model_Tao_plan:
         try:
             if self.configruation_docker_path():
                 os.makedirs(os.path.join(os.getcwd(),"model_respository",self.model_name,"1"),exist_ok=True)            
-                dim="3,720,1280"
+                dim="3,384,1248"
                 with open(os.path.join(os.getcwd(),"models",self.model_name,"pgie_config.txt"),"r") as read_pige:
                     conf_read=read_pige.read()
                 out_config=conf_read[re.search("output-blob-names",conf_read).end()+1:].split("\n")[0].replace(";",",")
                 key_name=conf_read[re.search("tlt-model-key",conf_read).end()+1:].split("\n")[0]
+                console_logger.debug(os.path.isfile(os.path.join(os.getcwd(),"model_respository",self.model_name,"1","model.plan")))
                 if os.path.isfile(os.path.join(os.getcwd(),"model_respository",self.model_name,"1","model.plan")):
                     console_logger.debug("Already Plan file present ....")
                     return True
                 else:
-                    p_tao = subprocess.Popen(["tao","converter", "/opt/tao_models/model/resnet18_detector.etlt", "-k",key_name, "-d",dim, "-o",out_config, "-m", "32", "-e", "/opt/tritonserver/model_plane/model.plan"], stdout=subprocess.PIPE)
+                    p_tao = subprocess.Popen(["tao","converter", "/opt/tao_models/model/resnet18_detector.etlt", "-k",key_name, "-o",out_config, "-m", "32","-i","nc","-d","3,384,1248","-p","Input,1x3x384x1248,8x3x384x1248,16x3x384x1248","-e", "/opt/tritonserver/model_plane/model.plan"], stdout=subprocess.PIPE)
                     p_tao.wait()
                     out, err = p_tao.communicate()
                     out = out.decode('UTF-8')
@@ -172,12 +173,12 @@ class Tao_Model_Tao_plan:
             gpu=docker.types.DeviceRequest(device_ids=["0"], capabilities=[['gpu']])
             self.container_name="tao_triton_server"
             if bool(client.containers.list(filters={"name":"tao_triton_server","status":"running"})):
-                # client.containers.list(filters={"name":"tao_triton_server","status":"running"})[0].stop()
-                # console_logger.debug("tao_triton_server alreay stop wait  to close")               
-                # client.containers.run("nvcr.io/nvidia/tritonserver:22.05-py3",command="tritonserver --model-repository=/opt/tritonserver/models --strict-model-config=false --grpc-infer-allocation-pool-size=16",auto_remove=True,device_requests=[gpu],ipc_mode="host",ports={"8000":8000,"8001":8001,"8002":8002},volumes=[f"{os.getcwd()}/model_respository:/opt/tritonserver/models"],detach=True,name=self.container_name)
+                client.containers.list(filters={"name":"tao_triton_server","status":"running"})[0].stop()
+                console_logger.debug("tao_triton_server alreay stop wait  to close")               
+                client.containers.run("nvcr.io/nvidia/tritonserver:22.05-py3",command="tritonserver --model-repository=/opt/tritonserver/models --strict-model-config=false --grpc-infer-allocation-pool-size=16 --model-control-mode=explicit ",auto_remove=True,device_requests=[gpu],ipc_mode="host",ports={"8000":8000,"8001":8001,"8002":8002},volumes=[f"{os.getcwd()}/model_respository:/opt/tritonserver/models"],detach=True,name=self.container_name)
                 console_logger.debug("Trion Server Already Start")
             else:
-                 client.containers.run("nvcr.io/nvidia/tritonserver:22.05-py3",command="tritonserver --model-repository=/opt/tritonserver/models --strict-model-config=false --grpc-infer-allocation-pool-size=16",auto_remove=True,device_requests=[gpu],ipc_mode="host",ports={"8000":8000,"8001":8001,"8002":8002},volumes=[f"{os.getcwd()}/model_respository:/opt/tritonserver/models"],detach=True,name=self.container_name)
+                 client.containers.run("nvcr.io/nvidia/tritonserver:22.05-py3",command="tritonserver --model-repository=/opt/tritonserver/models --strict-model-config=false --grpc-infer-allocation-pool-size=16 ",auto_remove=True,device_requests=[gpu],ipc_mode="host",ports={"8000":8000,"8001":8001,"8002":8002},volumes=[f"{os.getcwd()}/model_respository:/opt/tritonserver/models"],detach=True,name=self.container_name)
                  console_logger.debug("Triton Server Started .... ") 
                  time.sleep(5)    
         else:
@@ -192,7 +193,7 @@ class Tao_Model_Tao_plan:
 
 
 if __name__=="__main__":
-    tao_server_pipeline=Tao_Model_Tao_plan(model_name="hat")
+    tao_server_pipeline=Tao_Model_Tao_plan(model_name="fire")
     # tao_server_pipeline.create_triton_config_file()
     tao_server_pipeline.triton_server_start()
 

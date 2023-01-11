@@ -248,13 +248,17 @@ def main(dicst):
             dicst["batch_size"], pose_sequences, dicst["output_path"]
         ]
     else:
+        if dicst["mode"].lower()=="yolov3":
+            args_postprocessor = [
+            dicst["batch_size"],frames, dicst["output_path"], triton_model.data_format,class_list
+        ]
         args_postprocessor = [
-            dicst["batch_size"], frames, dicst["output_path"], triton_model.data_format
+            dicst["batch_size"],frames, dicst["output_path"], triton_model.data_format
         ]
         if dicst["mode"].lower() == "detectnet_v2":
             args_postprocessor.extend([class_list, dicst["postprocessing_config"], target_shape])
+            
     postprocessor = POSTPROCESSOR_DICT[dicst["mode"].lower()](*args_postprocessor)
-
     # Holds the handles to the ongoing HTTP async requests.
     async_requests = []
 

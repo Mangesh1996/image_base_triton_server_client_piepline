@@ -34,14 +34,16 @@ def trt_output_process_fn(y_encoded):
     "function to process TRT model output."
     keep_k, boxes, scores, cls_id = y_encoded
     result = []
+    
     for idx, k in enumerate(keep_k.reshape(-1)):
         mul = np.array([960,
                         544,
                         960,
                         544])
-        loc = boxes[idx].reshape(-1, 4)[:k] * mul
-        cid = cls_id[idx].reshape(-1, 1)[:k]
-        conf = scores[idx].reshape(-1, 1)[:k]
+        
+        loc = boxes.reshape(-1, 4)[idx][:k] * mul
+        cid = cls_id.reshape(-1, 1)[idx][:k]
+        conf = scores.reshape(-1, 1)[idx][:k]
         result.append(np.concatenate((cid, conf, loc), axis=-1))
     return result
 
@@ -49,7 +51,7 @@ def trt_output_process_fn(y_encoded):
 class YOLOv3Postprocessor(Postprocessor):
     """Class to run post processing of Triton Tensors."""
 
-    def __init__(self, batch_size, frames, output_path, data_format):
+    def __init__(self,batch_size, frames, output_path, data_format,class_list):
         """Initialize a post processor class for a yolov3 model.
         
         Args:
@@ -60,6 +62,7 @@ class YOLOv3Postprocessor(Postprocessor):
                 "channels_first": CHW order.
                 "channels_last": HWC order.
         """
+        self.class_list=class_list
         super().__init__(batch_size, frames, output_path, data_format)
         self.output_names = ["BatchedNMS",
                              "BatchedNMS_1",
@@ -67,7 +70,7 @@ class YOLOv3Postprocessor(Postprocessor):
                              "BatchedNMS_3"]
         self.threshold = 0.8
         self.keep_aspect_ratio = True
-        self.class_mapping = {0: 'bicycle', 1: 'car', 2: 'person', 3: 'road_sign'}
+        self.class_mapping = {index:class_name for index,class_name in enumerate(self.class_list)}
 
     def _get_bbox_and_kitti_label_single_img(
         self, img, img_ratio, y_decoded,
@@ -81,34 +84,34 @@ class YOLOv3Postprocessor(Postprocessor):
         draw = ImageDraw.Draw(img)
         color_list = ['Black', 'Red', 'Blue', 'Gold', 'Purple']
         for i in y_decoded:
-            if float(i[1]) < self.threshold:
+            if float(y_decoded[1]) < self.threshold:
                 continue
 
             if self.keep_aspect_ratio:
-                i[2:6] *= img_ratio
+                y_decoded[2:6] *= img_ratio
             else:
                 orig_w, orig_h = img.size
                 ratio_w = float(orig_w) / self.model_input_width
                 ratio_h = float(orig_h) / self.model_input_height
-                i[2] *= ratio_w
-                i[3] *= ratio_h
-                i[4] *= ratio_w
-                i[5] *= ratio_h
-
+                y_decoded[2] *= ratio_w
+                y_decoded[3] *= ratio_h
+                y_decoded[4] *= ratio_w
+                y_decoded[5] *= ratio_h
+            
             if is_kitti_export:
-                kitti_txt += self.class_mapping[int(i[0])] + ' 0 0 0 ' + \
-                    ' '.join([str(x) for x in i[2:6]])+' 0 0 0 0 0 0 0 ' + str(i[1])+'\n'
+                kitti_txt += self.class_mapping[int(y_decoded[0])] + ' 0 0 0 ' + \
+                    ' '.join([str(x) for x in y_decoded[2:6]])+' 0 0 0 0 0 0 0 ' + str(y_decoded[1])+'\n'
 
             if is_draw_img:
                 draw.rectangle(
-                    ((i[2], i[3]), (i[4], i[5])),
-                    outline=color_list[int(i[0]) % len(color_list)]
+                    ((y_decoded[2], y_decoded[3]), (y_decoded[4], y_decoded[5])),
+                    outline=color_list[int(y_decoded[0]) % len(color_list)]
                 )
                 # txt pad
-                draw.rectangle(((i[2], i[3]), (i[2] + 100, i[3]+10)),
-                               fill=color_list[int(i[0]) % len(color_list)])
+                draw.rectangle(((y_decoded[2],y_decoded[3]), (y_decoded[2] + 100, y_decoded[3]+10)),
+                               fill=color_list[int(y_decoded[0]) % len(color_list)])
 
-                draw.text((i[2], i[3]), "{0}: {1:.2f}".format(self.class_mapping[int(i[0])], i[1]))
+                draw.text((y_decoded[2], y_decoded[3]), "{0}: {1:.2f}".format(self.class_mapping[int(y_decoded[0])], y_decoded[1]))
 
 
         return img, kitti_txt
@@ -129,7 +132,7 @@ class YOLOv3Postprocessor(Postprocessor):
 
         y_pred_decoded = trt_output_process_fn(y_pred)
 
-
+        
         for image_idx in range(self.batch_size):
             current_idx = (int(this_id) - 1) * self.batch_size + image_idx
             if current_idx >= len(self.frames):

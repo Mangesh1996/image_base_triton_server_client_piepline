@@ -44,7 +44,7 @@ def write_kitti_annotation(filename, objects):
     ts=[{lable.category:list(map(int,lable.box))} for lable in objects]
     data_dicts[filename]=ts
     data_meta=f'''{data_dicts}\n'''
-    print(data_meta)
+
     
     ts=[]
     return 1

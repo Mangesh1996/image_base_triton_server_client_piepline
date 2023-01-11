@@ -37,10 +37,10 @@ class Triton_Inference_Client():
             Triton_Inference_Client.deploy_healthcheck(dicst)
 
     def tao_client(dicst,model_name):
-        with open(os.path.join(os.getcwd(),"model_respository",model_name,"labels.txt"),"r") as labels_name:
+        with open(os.path.join(os.getcwd(),"..","trion_server","model_respository",model_name,"labels.txt"),"r") as labels_name:
             label_name=labels_name.read().splitlines()
         label_names=",".join(label_name)
-        dicst["postprocessing_config"]=f"{os.getcwd()}/models/{model_name}/clustering_config.prototxt"
+        dicst["postprocessing_config"]=f"{os.getcwd()}/../trion_server/models/{model_name}/clustering_config.prototxt"
         dicst["class_list"]=label_names
         # self.dicts={"verbose":False,"async_set":False,"streaming":False,"model_name":"hat","model_version":str(1),"batch_size":1,"mode":"DetectNet_v2","url":"localhost:8000","protocol":"HTTP","image_filename":f"{os.getcwd()}/input_image","class_list":"with_hat,without_hat","output_path":"out","postprocessing_config":f"{os.getcwd()}/models/hat/clustering_config.prototxt","dataset_convert_config":""}
         tao_client_run.main(dicst)
@@ -49,7 +49,7 @@ class Triton_Inference_Client():
         
 if __name__=="__main__":
     image_path=[f"{os.getcwd()}/input_image",f"{os.getcwd()}/input_image"]
-    dicts={"verbose":False,"async_set":True,"streaming":True,"model_name":"hat","model_version":str(1),"batch_size":32,"mode":"DetectNet_v2","url":"localhost:8001","protocol":"grpc","image_filename":image_path[0],"class_list":"","output_path":f"out","postprocessing_config":"","dataset_convert_config":""}
+    dicts={"verbose":False,"async_set":True,"streaming":True,"model_name":"bluedartstack","model_version":str(1),"batch_size":32,"mode":"DetectNet_v2","url":"localhost:8001","protocol":"grpc","image_filename":image_path[0],"class_list":"","output_path":f"out","postprocessing_config":"","dataset_convert_config":""}
     client_call=Triton_Inference_Client()
     # client_call.deploy_healthcheck()
     client_call.deploy_healthcheck(dicts)

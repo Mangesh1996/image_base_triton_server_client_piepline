@@ -19,9 +19,10 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-"""Model class for the DetectNet_v2 Triton Model."""
+"""Triton inference client for TAO Toolkit model."""
 
 import os
+import numpy as np
 
 import tritonclient.grpc as grpcclient
 import tritonclient.grpc.model_config_pb2 as mc
@@ -31,13 +32,16 @@ from tritonclient.utils import triton_to_np_dtype
 
 from tao_triton.python.model.triton_model import TritonModel
 
+CHANNEL_MODES = ["rgb", "bgr", "l"]
 
-class DetectnetModel(TritonModel):
+
+class YOLOv3Model(TritonModel):
     """Simple class to run model inference using Triton client."""
 
     def __init__(self, max_batch_size, input_names, output_names,
-                 channels, height, width, data_format, triton_dtype):
-        """Set up a detectnet_v2 triton model instance.
+                 channels, height, width, data_format,
+                 triton_dtype, channel_mode="RGB"):
+        """Set up a yolov3 triton model instance.
         
         Args:
             max_batch_size(int): The maximum batch size of the TensorRT engine.
@@ -54,22 +58,22 @@ class DetectnetModel(TritonModel):
                 "RGB" or "BGR"
                 
         Returns:
-            An instance of the DetectnetModel.
+            An instance of the YOLOv3Model.
         """
         super().__init__(max_batch_size, input_names, output_names,
                          channels, height, width, data_format,
                          triton_dtype)
-        self.scale = 1. / 255.0
+        self.scale = 1.0
 
     @staticmethod
     def parse_model(model_metadata, model_config):
-        """Simple class to parse model metadata and model config."""
+        """Parse model metadata and model config from the triton server."""
         if len(model_metadata.inputs) != 1:
             raise Exception("expecting 1 input, got {}".format(
                 len(model_metadata.inputs)))
 
-        if len(model_metadata.outputs) != 2:
-            raise Exception("expecting 2 output, got {}".format(
+        if len(model_metadata.outputs) != 4:
+            raise Exception("expecting 4 output, got {}".format(
                 len(model_metadata.outputs)))
 
         if len(model_config.input) != 1:
@@ -77,18 +81,25 @@ class DetectnetModel(TritonModel):
                 "expecting 1 input in model configuration, got {}".format(
                     len(model_config.input)))
 
-        if len(model_config.output) != 2:
+        if len(model_config.output) != 4:
             raise Exception(
-                "expecting 2 outputs in model configuration, got {}".format(
-                    len(model_config.output)))
+                "expecting 2 input in model configuration, got {}".format(
+                    len(model_config.input)))
 
         input_metadata = model_metadata.inputs[0]
         input_config = model_config.input[0]
         output_metadata = model_metadata.outputs
 
-        for data in output_metadata:
-            if data.datatype != "FP32":
-                raise Exception("expecting output datatype to be FP32, model '" +
+
+        for _, data in enumerate(output_metadata):
+            if _ == 0 :
+                if data.datatype != "INT32":
+                    raise Exception("expecting output datatype to be INT32, model '" +
+                                data.name + "' output type is " +
+                                data.datatype)
+            if _ != 0 :
+                if data.datatype != "FP32":
+                    raise Exception("expecting output datatype to be FP32, model '" +
                                 data.name + "' output type is " +
                                 data.datatype)
 
@@ -105,7 +116,7 @@ class DetectnetModel(TritonModel):
         if type(input_config.format) == str:
             FORMAT_ENUM_TO_INT = dict(mc.ModelInput.Format.items())
             input_config.format = FORMAT_ENUM_TO_INT[input_config.format]
-
+        
         if ((input_config.format != mc.ModelInput.FORMAT_NCHW) and
             (input_config.format != mc.ModelInput.FORMAT_NHWC)):
             raise Exception("unexpected input format " +
@@ -124,7 +135,10 @@ class DetectnetModel(TritonModel):
             h = input_metadata.shape[2 if input_batch_dim else 1]
             w = input_metadata.shape[3 if input_batch_dim else 2]
 
-        # This part should be be where the input and output names are returned.
+        print(model_config.max_batch_size, input_metadata.name,
+                [data.name for data in output_metadata], c, h, w, input_config.format,
+                input_metadata.datatype)
+
         return (model_config.max_batch_size, input_metadata.name,
                 [data.name for data in output_metadata], c, h, w, input_config.format,
                 input_metadata.datatype)
